@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Currency Converter",
+    "description": "This extension converts prices from Lei to USD",
+    "version": "1.0",
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://www.emag.ro/*", "https://www.ozone.ro/*"],
+            "js": ["content.js"],
+            "css": ["content.css"]
+        }
+    ],
+
+    "permissions": ["scripting", "activeTab"],
+    "host_permissions": ["https://cdn.jsdelivr.net/"]
+}
