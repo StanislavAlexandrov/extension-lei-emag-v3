@@ -1,6 +1,7 @@
 // Track conversion state
 let isConverted = false;
 let currentExchangeRate = 0;
+let autoConvertEnabled = true; // Default to auto-convert
 
 // Create and append a tooltip element for hover information
 const tooltip = document.createElement('div');
@@ -19,11 +20,22 @@ const PRICE_SELECTORS = [
     '.price',
     '.product-price',
 
-    // Common selectors that might work on both
+    // IKEA selectors
+    '.plp-price__sr-text',
+    '.plp-price__current',
+    '.plp-price-module__price span',
+    '.pip-temp-price__integer',
+    '.pip-price-package__integer',
+
+    // Common selectors that might work on multiple sites
     '.price-wrapper',
     '.regular-price',
     '.special-price',
     '[itemprop="price"]',
+    '.money', // Common class for prices
+    '.current-price',
+    '.product__price',
+    '.amount',
 ];
 
 // Function to extract numeric price from text
@@ -45,8 +57,13 @@ function convertPrices(exchangeRate) {
     let conversionCount = 0;
 
     elements.forEach((element) => {
-        // Skip if already processed
-        if (element.getAttribute('data-processed')) return;
+        // Skip if already processed and has same exchange rate
+        if (
+            element.getAttribute('data-processed') === 'true' &&
+            parseFloat(element.getAttribute('data-exchange-rate') || '0') ===
+                exchangeRate
+        )
+            return;
 
         const originalText = element.innerText.trim();
         // Skip empty elements
@@ -85,6 +102,9 @@ function convertPrices(exchangeRate) {
             // Update the element with converted price
             element.textContent = `$${amountInUsd} USD`;
             element.classList.add('price-converted');
+
+            // Store the exchange rate used for this conversion
+            element.setAttribute('data-exchange-rate', exchangeRate.toString());
 
             // Mark as processed
             element.setAttribute('data-processed', 'true');
@@ -149,6 +169,41 @@ function restoreOriginalPrices() {
     });
 }
 
+// Set up a mutation observer to detect when new prices are added to the page
+function setupMutationObserver() {
+    // Create a new observer
+    const observer = new MutationObserver((mutations) => {
+        if (isConverted) {
+            // If we're in converted state, check for new price elements
+            let newElementsFound = false;
+
+            mutations.forEach((mutation) => {
+                if (
+                    mutation.type === 'childList' &&
+                    mutation.addedNodes.length > 0
+                ) {
+                    // Check if any added nodes might contain price elements
+                    newElementsFound = true;
+                }
+            });
+
+            if (newElementsFound) {
+                // If new elements were added, re-run conversion on the page
+                console.log('New elements detected, re-converting prices');
+                convertPrices(currentExchangeRate);
+            }
+        }
+    });
+
+    // Configure and start the observer
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
+
+    console.log('Mutation observer set up for dynamic content');
+}
+
 // Message listener
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     if (request.action === 'convertCurrency') {
@@ -161,12 +216,42 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
         sendResponse({
             isConverted: isConverted,
             currentRate: currentExchangeRate,
+            autoConvertEnabled: autoConvertEnabled,
         });
+    } else if (request.action === 'setAutoConvert') {
+        autoConvertEnabled = request.enabled;
+        sendResponse({ success: true });
     }
     return true; // Keep the message channel open for the async response
 });
 
-// Run once when page is fully loaded to detect if any other content scripts have already processed the page
+// Auto-convert functionality
+function autoConvertIfEnabled() {
+    // First check if auto-convert setting is enabled
+    chrome.storage.local.get(['autoConvertEnabled'], (result) => {
+        // If no setting is found, default to true (enabled)
+        const autoEnabled =
+            result.autoConvertEnabled !== undefined
+                ? result.autoConvertEnabled
+                : true;
+
+        autoConvertEnabled = autoEnabled;
+
+        if (autoEnabled) {
+            // Get the exchange rate and convert prices
+            chrome.runtime.sendMessage(
+                { action: 'getExchangeRate' },
+                (response) => {
+                    if (response && response.exchangeRate) {
+                        convertPrices(response.exchangeRate);
+                    }
+                }
+            );
+        }
+    });
+}
+
+// Run once when page is fully loaded
 window.addEventListener('load', function () {
     // Check if there are already converted prices
     const convertedElements = document.querySelectorAll(
@@ -175,6 +260,12 @@ window.addEventListener('load', function () {
     if (convertedElements.length > 0) {
         isConverted = true;
     }
+
+    // Set up observer for dynamically loaded content
+    setupMutationObserver();
+
+    // Auto-convert if enabled
+    autoConvertIfEnabled();
 
     // Let the popup know we're ready
     chrome.runtime.sendMessage({

@@ -5,6 +5,9 @@ let exchangeRateData = {
     isLoading: false,
 };
 
+// Auto-convert setting
+let autoConvertEnabled = true; // Default to enabled
+
 // Cache duration in milliseconds (4 hours)
 const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
@@ -55,13 +58,28 @@ async function fetchLatestExchangeRate() {
 // Initialize: try to load from storage, then fetch fresh data
 chrome.runtime.onInstalled.addListener(async () => {
     try {
+        // Load exchange rate from storage
         const result = await chrome.storage.local.get('exchangeRateData');
         if (result.exchangeRateData) {
             exchangeRateData = result.exchangeRateData;
             console.log('Loaded cached exchange rate:', exchangeRateData.rate);
         }
+
+        // Load auto-convert setting from storage
+        const autoConvertResult = await chrome.storage.local.get(
+            'autoConvertEnabled'
+        );
+        if (autoConvertResult.autoConvertEnabled !== undefined) {
+            autoConvertEnabled = autoConvertResult.autoConvertEnabled;
+            console.log('Loaded auto-convert setting:', autoConvertEnabled);
+        } else {
+            // If setting doesn't exist yet, initialize it
+            chrome.storage.local.set({
+                autoConvertEnabled: autoConvertEnabled,
+            });
+        }
     } catch (e) {
-        console.error('Error loading cached exchange rate:', e);
+        console.error('Error loading cached data:', e);
     }
 
     // Fetch fresh rate regardless of cache
@@ -92,5 +110,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
         });
         return true; // Keep the message channel open for the async response
+    }
+
+    if (request.action === 'getAutoConvertSetting') {
+        sendResponse({
+            enabled: autoConvertEnabled,
+        });
+        return true;
+    }
+
+    if (request.action === 'setAutoConvertSetting') {
+        autoConvertEnabled = request.enabled;
+        chrome.storage.local.set({ autoConvertEnabled: autoConvertEnabled });
+        sendResponse({
+            success: true,
+        });
+        return true;
     }
 });
