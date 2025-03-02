@@ -24,7 +24,11 @@
                 "https://www.flanco.ro/*",
                 "https://www.pcgarage.ro/*",
                 "https://www.evomag.ro/*",
-                "https://www.ikea.ro/*"
+                "https://www.ikea.ro/*",
+                "https://www.ikea.com/ro/*",
+                "https://www.massimodutti.com/ro/*",
+                "https://www.oysho.com/ro/*",
+                "https://ro.marella.com/*"
             ],
             "js": ["content.js"],
             "css": ["content.css"],
@@ -32,7 +36,10 @@
         }
     ],
     "permissions": ["scripting", "activeTab", "storage"],
-    "host_permissions": ["https://cdn.jsdelivr.net/"],
+    "host_permissions": [
+        "https://cdn.jsdelivr.net/",
+        "https://ro.marella.com/*"
+    ],
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",

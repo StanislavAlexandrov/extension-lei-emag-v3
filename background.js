@@ -1,6 +1,6 @@
 // Global variables for exchange rate handling
 let exchangeRateData = {
-    rate: 0.22, // Initial fallback value
+    rate: 0.21, // Initial fallback value
     lastUpdated: 0,
     isLoading: false,
 };

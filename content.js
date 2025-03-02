@@ -36,16 +36,40 @@ const PRICE_SELECTORS = [
     '.current-price',
     '.product__price',
     '.amount',
+    //testing marella ro
+    '[data-price]',
 ];
 
 // Function to extract numeric price from text
-function extractPrice(priceText) {
-    // Handle currency symbols, commas, and various formats
-    return parseFloat(
-        priceText
-            .replace(/[^\d,\.]/g, '') // Remove all non-numeric characters except comma and period
-            .replace(',', '.') // Convert comma to period for parseFloat
-    );
+function extractPrice(priceElement) {
+    console.log('🔍 Processing price element:', priceElement);
+
+    // First, try to get the price from the `data-price` attribute
+    let priceFromAttribute = priceElement
+        .closest('[data-price]')
+        ?.getAttribute('data-price');
+    if (priceFromAttribute) {
+        console.log('✅ Extracted from `data-price`:', priceFromAttribute);
+        return parseFloat(priceFromAttribute);
+    }
+
+    // Fallback: Extract price from text
+    let priceText = priceElement.innerText.trim();
+    console.log('🔍 Raw price text:', priceText);
+
+    // Remove "Preţ" and "lei"
+    let cleanedText = priceText.replace(/Preţ|\s*lei.*/gi, '').trim();
+
+    // Handle cases like "89,90lei/2 buc."
+    let numberMatch = cleanedText.match(/[\d,.]+/g);
+    if (!numberMatch) return null;
+
+    cleanedText = numberMatch[0]; // Use first found number
+    cleanedText = cleanedText.replace(',', '.'); // Convert commas to decimals
+
+    let price = parseFloat(cleanedText);
+    console.log('💰 Extracted clean price:', price);
+    return isNaN(price) ? null : price;
 }
 
 // Function to convert prices
@@ -57,7 +81,7 @@ function convertPrices(exchangeRate) {
     let conversionCount = 0;
 
     elements.forEach((element) => {
-        // Skip if already processed and has same exchange rate
+        // Skip if already processed and has the same exchange rate
         if (
             element.getAttribute('data-processed') === 'true' &&
             parseFloat(element.getAttribute('data-exchange-rate') || '0') ===
@@ -65,23 +89,31 @@ function convertPrices(exchangeRate) {
         )
             return;
 
-        const originalText = element.innerText.trim();
-        // Skip empty elements
-        if (!originalText) return;
-
         try {
             // Extract the price
-            const amountInLei = extractPrice(originalText);
+            const amountInLei = extractPrice(element);
+
+            // Log extracted price for debugging
+            console.log('🔍 Found price text:', element.innerText.trim());
+            console.log('💰 Extracted price in RON:', amountInLei);
 
             // Skip if not a valid number
-            if (isNaN(amountInLei) || amountInLei <= 0) return;
+            if (!amountInLei || isNaN(amountInLei) || amountInLei <= 0) {
+                console.warn(
+                    '⚠️ Skipping invalid price:',
+                    element.innerText.trim()
+                );
+                return;
+            }
 
             // Calculate USD amount
             const amountInUsd = (amountInLei * exchangeRate).toFixed(2);
+            console.log(
+                `✅ Converted ${amountInLei} RON to $${amountInUsd} USD`
+            );
 
             // Create wrapper if not already wrapped
             if (!element.classList.contains('price-container')) {
-                // Create wrapper
                 const wrapper = document.createElement('div');
                 wrapper.className = 'price-container';
                 element.parentNode.insertBefore(wrapper, element);
@@ -90,13 +122,16 @@ function convertPrices(exchangeRate) {
                 // Create original price element
                 const originalPrice = document.createElement('div');
                 originalPrice.className = 'price-original';
-                originalPrice.textContent = `Original: ${originalText}`;
+                originalPrice.textContent = `Original: ${element.innerText.trim()}`;
                 wrapper.appendChild(originalPrice);
             }
 
             // Save original text if not already saved
             if (!element.hasAttribute('data-original-price')) {
-                element.setAttribute('data-original-price', originalText);
+                element.setAttribute(
+                    'data-original-price',
+                    element.innerText.trim()
+                );
             }
 
             // Update the element with converted price
@@ -112,7 +147,9 @@ function convertPrices(exchangeRate) {
 
             // Add hover event for the element
             element.addEventListener('mouseover', function (e) {
-                tooltip.textContent = `Original: ${originalText} | Rate: 1 RON = $${exchangeRate} USD`;
+                tooltip.textContent = `Original: ${element.getAttribute(
+                    'data-original-price'
+                )} | Rate: 1 RON = $${exchangeRate} USD`;
                 tooltip.style.opacity = '1';
                 tooltip.style.left = e.pageX + 10 + 'px';
                 tooltip.style.top = e.pageY + 10 + 'px';
@@ -128,21 +165,14 @@ function convertPrices(exchangeRate) {
             });
         } catch (error) {
             console.error(
-                `Error converting price for element:`,
+                `❌ Error converting price for element:`,
                 element,
                 error
             );
         }
     });
 
-    isConverted = true;
-    console.log(`Converted ${conversionCount} prices from RON to USD`);
-
-    // Notify popup about the conversion result
-    chrome.runtime.sendMessage({
-        action: 'conversionComplete',
-        count: conversionCount,
-    });
+    console.log(`✅ Converted ${conversionCount} prices from RON to USD`);
 }
 
 // Function to restore original prices
