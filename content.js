@@ -170,6 +170,9 @@ function convertPrices(exchangeRate) {
                 error
             );
         }
+
+        // Set isConverted to true after conversion
+        isConverted = true;
     });
 
     console.log(`✅ Converted ${conversionCount} prices from RON to USD`);
