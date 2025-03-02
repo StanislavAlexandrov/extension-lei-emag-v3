@@ -1,3 +1,27 @@
-* {
-    font: 12px;
+.price-converted {
+    color: #2e7d32 !important;
+    font-weight: bold !important;
+    transition: color 0.3s ease;
+}
+
+.price-original {
+    display: none;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.price-container:hover .price-original {
+    display: block;
+}
+
+.conversion-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    z-index: 9999;
+    pointer-events: none;
+    transition: opacity 0.3s;
 }

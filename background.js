@@ -1,25 +1,96 @@
-// Global variable to hold the exchange rate
-var exchangeRate = 0.22; // Initial fallback value
+// Global variables for exchange rate handling
+let exchangeRateData = {
+    rate: 0.22, // Initial fallback value
+    lastUpdated: 0,
+    isLoading: false,
+};
+
+// Cache duration in milliseconds (4 hours)
+const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 // Function to fetch latest exchange rate
 async function fetchLatestExchangeRate() {
+    // Don't fetch if already loading or if cache is still valid
+    const now = Date.now();
+    if (
+        exchangeRateData.isLoading ||
+        (now - exchangeRateData.lastUpdated < CACHE_DURATION &&
+            exchangeRateData.lastUpdated !== 0)
+    ) {
+        return exchangeRateData.rate;
+    }
+
+    exchangeRateData.isLoading = true;
+
     try {
         const response = await fetch(
-            'https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/ron.json'
+            'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/ron.json'
         );
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
         const data = await response.json();
-        console.log(data.ron.usd + " this is what's returned");
-        exchangeRate = data.ron.usd; // Update the global variable
+        console.log(`Fetched exchange rate: ${data.ron.usd}`);
+
+        // Update the exchange rate data
+        exchangeRateData = {
+            rate: data.ron.usd,
+            lastUpdated: now,
+            isLoading: false,
+        };
+
+        // Store in local storage for persistence across browser restarts
+        chrome.storage.local.set({ exchangeRateData: exchangeRateData });
+
+        return exchangeRateData.rate;
     } catch (error) {
         console.error('Error fetching exchange rate:', error);
-        // Fallback value is already set, no need to set it again
+        exchangeRateData.isLoading = false;
+        return exchangeRateData.rate; // Return existing rate on error
     }
 }
 
-// Fetch the exchange rate when the service worker starts
-fetchLatestExchangeRate();
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+// Initialize: try to load from storage, then fetch fresh data
+chrome.runtime.onInstalled.addListener(async () => {
+    try {
+        const result = await chrome.storage.local.get('exchangeRateData');
+        if (result.exchangeRateData) {
+            exchangeRateData = result.exchangeRateData;
+            console.log('Loaded cached exchange rate:', exchangeRateData.rate);
+        }
+    } catch (e) {
+        console.error('Error loading cached exchange rate:', e);
+    }
+
+    // Fetch fresh rate regardless of cache
+    fetchLatestExchangeRate();
+});
+
+// Message handler
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getExchangeRate') {
-        sendResponse({ exchangeRate: exchangeRate });
+        // Return immediately with current rate
+        sendResponse({
+            exchangeRate: exchangeRateData.rate,
+            lastUpdated: exchangeRateData.lastUpdated,
+        });
+
+        // Then refresh in background if needed
+        fetchLatestExchangeRate();
+        return true; // Keep the message channel open for the async response
+    }
+
+    if (request.action === 'forceRefreshRate') {
+        // Reset last updated time to force a refresh
+        exchangeRateData.lastUpdated = 0;
+        fetchLatestExchangeRate().then((rate) => {
+            sendResponse({
+                exchangeRate: rate,
+                lastUpdated: exchangeRateData.lastUpdated,
+            });
+        });
+        return true; // Keep the message channel open for the async response
     }
 });

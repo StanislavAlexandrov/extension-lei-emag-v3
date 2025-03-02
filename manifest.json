@@ -1,22 +1,41 @@
 {
     "manifest_version": 3,
-    "name": "Currency Converter",
-    "description": "This extension converts prices from Lei to USD",
-    "version": "1.0",
+    "name": "RON to USD Currency Converter",
+    "description": "Converts Romanian Leu (RON) prices to US Dollars (USD) on Romanian e-commerce websites",
+    "version": "1.1",
     "action": {
-        "default_popup": "popup.html"
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
     },
     "background": {
         "service_worker": "background.js"
     },
     "content_scripts": [
         {
-            "matches": ["https://www.emag.ro/*", "https://www.ozone.ro/*"],
+            "matches": [
+                "https://www.emag.ro/*",
+                "https://www.ozone.ro/*",
+                "https://www.altex.ro/*",
+                "https://www.cel.ro/*",
+                "https://www.flanco.ro/*",
+                "https://www.pcgarage.ro/*",
+                "https://www.evomag.ro/*",
+                "https://www.ikea.ro/*"
+            ],
             "js": ["content.js"],
-            "css": ["content.css"]
+            "css": ["content.css"],
+            "run_at": "document_end"
         }
     ],
-
-    "permissions": ["scripting", "activeTab"],
-    "host_permissions": ["https://cdn.jsdelivr.net/"]
+    "permissions": ["scripting", "activeTab", "storage"],
+    "host_permissions": ["https://cdn.jsdelivr.net/"],
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    }
 }
